@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+
+psql -U postgres postgres <<EOSQL
+    CREATE USER "${DATABASE_USER}"
+        WITH LOGIN
+        NOSUPERUSER
+        INHERIT CREATEDB
+        NOCREATEROLE
+        NOREPLICATION
+        CONNECTION LIMIT -1
+        PASSWORD '${DATABASE_PASS}';
+
+    CREATE DATABASE "${DATABASE_NAME}"
+        WITH OWNER "${DATABASE_USER}"
+        TEMPLATE template0
+        ENCODING 'WIN1252'
+        LC_COLLATE 'C'
+        LC_CTYPE 'C'
+        CONNECTION LIMIT=-1;
+
+    GRANT ALL PRIVILEGES \
+        ON DATABASE "${DATABASE_NAME}"
+	TO "${DATABASE_USER}";
+EOSQL
+
+psql -U postgres "${DATABASE_NAME}" <<EOSQL
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+EOSQL
