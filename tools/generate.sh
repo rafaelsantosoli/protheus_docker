@@ -1,170 +1,166 @@
 #!/bin/bash
 set -e
 
-#TODO: Gravar as variaveis usadas no docker-compose.yml gerado
-#      assim é possível reler os valores anteriores
+if [ -z "$1" ]; then
+    echo "Uso: $0 <nome_do_ambiente>"
+    exit 1
+fi
 
-printf "Qual release do Protheus deseja utilizar?\n"
-select release in 12.1.2210 12.1.2310 12.1.2410; do
-	test "${release}" && break
-	printf "opção invalida!\n"
-done
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
+ENV_NAME="$1"
+ENV_DIR="${PROJECT_ROOT}/environments/${ENV_NAME}"
+CONFIG_FILE="${ENV_DIR}/config.env"
 
-printf "Qual banco de dados deseja utilizar?\n"
-select banco_de_dados in postgres15 postgres16 mssql2019 mssql2022 oracle19; do
-	test "${banco_de_dados}" && break
-	printf "opção invalida!\n"
-done
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Erro: Configuração não encontrada em ${CONFIG_FILE}."
+    exit 1
+fi
 
+source "${CONFIG_FILE}"
 
-printf "Qual a expedição deseja utilizar?\n"
-select expedicao in next latest published; do
-	test "${expedicao}" && break
-	printf "opção invalida!\n"
-done
-
-
-printf "Qual idioma deseja utilizar?\n"
-select idioma in arg bra col mex per; do
-	test "${idioma}" && break
-	printf "opção invalida!\n"
-done
-
-case "${banco_de_dados}" in
-	postgres15)
-		dbdatabase="postgres"
-		;;
-	postgres16)
-		dbdatabase="postgres"
-		;;
-	mssql2019)
-		dbdatabase="mssql"
-		;;
-	mssql2022)
-		dbdatabase="mssql"
-		;;
-	oracle19)
-		dbdatabase="oracle"
-		;;
+case "${BANCO_DE_DADOS}" in
+    postgres15|postgres16) dbdatabase="postgres" ;;
+    mssql2019|mssql2022)   dbdatabase="mssql" ;;
+    oracle19)              dbdatabase="oracle" ;;
 esac
 
-case "${idioma}" in
-	bra)
-		congelada_idioma="exp"
-		;;
-	*)
-		congelada_idioma="${idioma}"
-		;;
+case "${IDIOMA}" in
+    bra) congelada_idioma="exp" ;;
+    *)   congelada_idioma="${IDIOMA}" ;;
 esac
 
-congelada_nome="p${release//./}mntdb${congelada_idioma}"
-dbalias="${release//./}_${idioma}"
+congelada_nome="p${RELEASE//./}mntdb${congelada_idioma}"
+dbalias="${RELEASE//./}_${IDIOMA}"
 database_user="protheus"
 
 exec 9<&1
-exec 1>docker-compose.yml
+exec 1>"${ENV_DIR}/docker-compose.yml"
 
 cat <<-EOF
 	version: "3.6"
 	services:
 EOF
 
-case "${banco_de_dados}" in
-	postgres15)
+case "${BANCO_DE_DADOS}" in
+	mssql2022)
 		cat <<-EOF
-		  postgres15:
-		    build: images/postgres15
+		  mssql2022:
+		    build: ../../images/mssql2022
+		    hostname: ${ENV_NAME}_mssql
 		    environment:
-		    - POSTGRES_PASSWORD=Postgres.123
-		    - DATABASE_USER=${database_user}
-		    - DATABASE_PASS=Protheus.123
-		    - DATABASE_NAME=${congelada_nome}
+		      - ACCEPT_EULA=Y
+		      - MSSQL_SA_PASSWORD=Mssql.123
+		      - DATABASE_USER=${database_user}
+		      - DATABASE_PASS=Protheus.123
+		      - DATABASE_NAME=${congelada_nome}
+		      - MSSQL_PID=Developer
+		      - MSSQL_MEMORY_LIMIT_MB=8192
 		    volumes:
-		    - "\${PWD}:/local"
-		    - "postgres15:/var/lib/postgresql/data"
+		      - "../../:/local"
+		      - "../../config/mssql.conf:/var/opt/mssql/mssql.conf"
+		      - "mssql_data:/var/opt/mssql/data"
+		      - "mssql_log:/var/opt/mssql/log"
 		    ports:
-		    - "5432"
+		      - "1433"
+		    ulimits:
+		      memlock: -1
+		      nofile:
+		        soft: 65536
+		        hard: 65536
+		    sysctls:
+		      - net.ipv4.ip_local_port_range=1024 65535
 		    deploy:
 		      resources:
 		        limits:
-		          cpus: 1
-		          memory: 1GB
-		EOF
-		;;
-	postgres16)
-		cat <<-EOF
-		  postgres16:
-		    build: images/postgres16
-		    environment:
-		    - POSTGRES_PASSWORD=Postgres.123
-		    - DATABASE_USER=${database_user}
-		    - DATABASE_PASS=Protheus.123
-		    - DATABASE_NAME=${congelada_nome}
-		    volumes:
-		    - "\${PWD}:/local"
-		    - "postgres16:/var/lib/postgresql/data"
-		    ports:
-		    - "5432"
-		    deploy:
-		      resources:
-		        limits:
-		          cpus: 1
-		          memory: 1GB
+		          cpus: 8
+		          memory: 10G
+		        reservations:
+		          cpus: 2
+		          memory: 4G
+		    healthcheck:
+		      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Mssql.123 -C -Q 'SELECT 1' || exit 1"]
+		      interval: 30s
+		      retries: 3
+		      start_period: 30s
 		EOF
 		;;
 	mssql2019)
 		cat <<-EOF
 		  mssql2019:
-		    build: images/mssql2019
+		    build: ../../images/mssql2019
+		    hostname: ${ENV_NAME}_mssql
 		    environment:
-		    - ACCEPT_EULA=yes
-		    - MSSQL_SA_PASSWORD=Mssql.123
-		    - DATABASE_USER=${database_user}
-		    - DATABASE_PASS=Protheus.123
-		    - DATABASE_NAME=${congelada_nome}
+		      - ACCEPT_EULA=Y
+		      - MSSQL_SA_PASSWORD=Mssql.123
+		      - DATABASE_USER=${database_user}
+		      - DATABASE_PASS=Protheus.123
+		      - DATABASE_NAME=${congelada_nome}
+		      - MSSQL_PID=Developer
 		    volumes:
-		    - "\${PWD}:/local"
-		    - "mssql2019:/var/opt/mssql"
+		      - "../../:/local"
+		      - "mssql2019:/var/opt/mssql"
 		    ports:
-		    - "1433"
+		      - "1433"
 		    deploy:
 		      resources:
 		        limits:
-		          cpus: 1
+		          cpus: 2
+		          memory: 4G
+		EOF
+		;;
+	postgres15)
+		cat <<-EOF
+		  postgres15:
+		    build: ../../images/postgres15
+		    environment:
+		      - POSTGRES_PASSWORD=Postgres.123
+		      - DATABASE_USER=${database_user}
+		      - DATABASE_PASS=Protheus.123
+		      - DATABASE_NAME=${congelada_nome}
+		    volumes:
+		      - "../../:/local"
+		      - "postgres15:/var/lib/postgresql/data"
+		    ports:
+		      - "5432"
+		    deploy:
+		      resources:
+		        limits:
+		          cpus: 2
 		          memory: 2GB
 		EOF
 		;;
-	mssql2022)
+	postgres16)
 		cat <<-EOF
-		  mssql2022:
-		    build: images/mssql2022
+		  postgres16:
+		    build: ../../images/postgres16
 		    environment:
-		    - ACCEPT_EULA=yes
-		    - MSSQL_SA_PASSWORD=Mssql.123
-		    - DATABASE_USER=${database_user}
-		    - DATABASE_PASS=Protheus.123
-		    - DATABASE_NAME=${congelada_nome}
+		      - POSTGRES_PASSWORD=Postgres.123
+		      - DATABASE_USER=${database_user}
+		      - DATABASE_PASS=Protheus.123
+		      - DATABASE_NAME=${congelada_nome}
 		    volumes:
-		    - "\${PWD}:/local"
-		    - "mssql2022:/var/opt/mssql"
+		      - "../../:/local"
+		      - "postgres16:/var/lib/postgresql/data"
 		    ports:
-		    - "1433"
+		      - "5432"
 		    deploy:
 		      resources:
 		        limits:
-		          cpus: 1
+		          cpus: 2
 		          memory: 2GB
 		EOF
 		;;
 	oracle19)
 		# oracle o usuario tem "o nome do banco"
+		# Ajuste: se necessario, corrigir logica do usuario para oracle no context de environment
 		database_user=${congelada_nome}
 		ORACLE_PDB=ORACLEPDB1
 
 		cat <<-EOF
 		  oracle19:
-		    build: images/oracle19
+		    build: ../../images/oracle19
 		    environment:
 		    - ORACLE_SID=ORACLE
 		    - ORACLE_PDB=${ORACLE_PDB}
@@ -173,7 +169,7 @@ case "${banco_de_dados}" in
 		    - DATABASE_PASS=Protheus.123
 		    - DATABASE_NAME=${congelada_nome}
 		    volumes:
-		    - "\${PWD}:/local"
+		    - "../../:/local"
 		    - "oracle19:/opt/oracle/oradata"
 		    ports:
 		    - "1521"
@@ -188,85 +184,49 @@ esac
 
 cat <<-EOF
   dbaccess:
-    build: images/dbaccess
-    command:
-    - "bash"
-    - "/local/tools/dbaccess.sh"
+    build: ../../images/dbaccess
+    command: ["bash", "/local/tools/dbaccess.sh"]
     environment:
-    - TOTVS_HOME=/local/data/totvs/
-    - DBACCESS_HOME=/local/data/totvs/dbaccess/multi/
-    - LICENSE_SERVER=\${LICENSE_SERVER:-localhost}
-    - LICENSE_PORT=\${LICENSE_PORT:-5555}
-    - DBACCESS_DRIVER=${dbdatabase}
-    - DBACCESS_ALIAS=${dbalias}
-    - DATABASE_HOST=${banco_de_dados}
-    - DATABASE_NAME=${congelada_nome}
-    - DATABASE_USER=${database_user}
-    - DATABASE_PASS=Protheus.123
-    - ORACLE_PDB=${ORACLE_PDB}
+      - TOTVS_HOME=/local/data/totvs/
+      - DBACCESS_HOME=/local/data/totvs/dbaccess/multi/
+      - LICENSE_SERVER=\${LICENSE_SERVER:-localhost}
+      - LICENSE_PORT=\${LICENSE_PORT:-5555}
+      - DBACCESS_DRIVER=${dbdatabase}
+      - DBACCESS_ALIAS=${dbalias}
     volumes:
-    - "\${PWD}:/local"
-    - "\${PWD}/data/totvs/dbaccess/configures/odbc.ini:/etc/odbc.ini"
-    - "\${PWD}/data/totvs/dbaccess/configures/tnsnames.ora:/opt/oracle/instantclient_21_5/network/admin/tnsnames.ora"
+      - "../../:/local"
+      - "../../data/totvs/dbaccess/configures/odbc.ini:/etc/odbc.ini"
+      - "../../data/totvs/dbaccess/configures/tnsnames.ora:/opt/oracle/instantclient_21_5/network/admin/tnsnames.ora"
     ports:
-    - "7890"
-    deploy:
-      resources:
-        limits:
-          cpus: 1
-          memory: 1GB
+      - "7890"
+    depends_on:
+      - ${BANCO_DE_DADOS}
+
   protheus:
-    build: images/protheus
-    command:
-    - "bash"
-    - "/local/tools/protheus.sh"
+    build: ../../images/protheus
+    command: ["bash", "/local/tools/protheus.sh"]
     environment:
-    - TOTVS_HOME=/local/data/totvs/
-    - PROTHEUS_HOME=/local/data/totvs/protheus/
-    - APPSERVER_HOME=/local/data/totvs/appserver/
-    - LICENSE_SERVER=\${LICENSE_SERVER:-localhost}
-    - LICENSE_PORT=\${LICENSE_PORT:-5555}
-    - DBSERVER=dbaccess
-    - DBPORT=7890
-    - DBDATABASE=${dbdatabase}
-    - DBALIAS=${dbalias}
-    - REGIONALLANGUAGE=${idioma}
+      - TOTVS_HOME=/local/data/totvs/
+      - PROTHEUS_HOME=/local/data/totvs/protheus/
+      - APPSERVER_HOME=/local/data/totvs/appserver/
+      - DBSERVER=dbaccess
+      - DBPORT=7890
+      - DBDATABASE=${dbdatabase}
+      - DBALIAS=${dbalias}
     volumes:
-    - "\${PWD}:/local"
+      - "../../:/local"
     ports:
-    - "8080"
-    deploy:
-      resources:
-        limits:
-          cpus: 1
-          memory: 1GB
+      - "8080"
+    depends_on:
+      - dbaccess
+
 volumes:
 EOF
 
-case "${banco_de_dados}" in
-	postgres15)
-		cat <<-EOF
-		  postgres15:
-		EOF
-		;;
-	postgres16)
-		cat <<-EOF
-		  postgres16:
-		EOF
-		;;
-	mssql2019)
-		cat <<-EOF
-		  mssql2019:
-		EOF
-		;;
-	mssql2022)
-		cat <<-EOF
-		  mssql2022:
-		EOF
-		;;
-	oracle19)
-		cat <<-EOF
-		  oracle19:
-		EOF
-		;;
+case "${BANCO_DE_DADOS}" in
+    mssql2022) echo "  mssql_data: {}"; echo "  mssql_log: {}" ;;
+    mssql2019) echo "  mssql2019: {}" ;;
+    postgres15) echo "  postgres15: {}" ;;
+    postgres16) echo "  postgres16: {}" ;;
+    oracle19) echo "  oracle19: {}" ;;
 esac
