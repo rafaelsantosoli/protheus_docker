@@ -284,6 +284,11 @@ download_and_extract "${CONGELADA_URL}" \
     "${PROJECT_ROOT}/data/totvs/dumps" \
     "custom_dump"
 
+# Ajusta permissões do diretório dumps para que o Oracle consiga ler/escrever
+chmod 777 "${PROJECT_ROOT}/data/totvs/dumps"
+chmod 644 "${PROJECT_ROOT}/data/totvs/dumps/"*.dmp 2>/dev/null || true
+chmod 644 "${PROJECT_ROOT}/data/totvs/dumps/"*.DMP 2>/dev/null || true
+
 # Protheus Data
 # A url foi definida anteriormente mas não estava sendo baixada.
 protheus_data_file=`basename ${PROTHEUSDATA_URL}`
