@@ -1,0 +1,60 @@
+version: "3.6"
+services:
+  oracle19:
+    build: ../../images/oracle19
+    environment:
+    - ORACLE_SID=ORACLE
+    - ORACLE_PDB=ORACLEPDB1
+    - ORACLE_PWD=Oracle.123
+    - DATABASE_USER=p1212510mntdbexp
+    - DATABASE_PASS=Protheus.123
+    - DATABASE_NAME=p1212510mntdbexp
+    volumes:
+    - "../../:/local"
+    - "oracle19:/opt/oracle/oradata"
+    ports:
+    - "1521"
+    deploy:
+      resources:
+        limits:
+          cpus: 2
+          memory: 6GB
+  dbaccess:
+    build: ../../images/dbaccess
+    command: ["bash", "/local/tools/dbaccess.sh"]
+    environment:
+      - TOTVS_HOME=/local/data/totvs/
+      - DBACCESS_HOME=/local/data/totvs/dbaccess/multi/
+      - LICENSE_SERVER=${LICENSE_SERVER:-localhost}
+      - LICENSE_PORT=${LICENSE_PORT:-5555}
+      - DBACCESS_DRIVER=oracle
+      - DBACCESS_ALIAS=1212510_bra
+    volumes:
+      - "../../:/local"
+      - "../../data/totvs/dbaccess/configures/odbc.ini:/etc/odbc.ini"
+      - "../../data/totvs/dbaccess/configures/tnsnames.ora:/opt/oracle/instantclient_21_5/network/admin/tnsnames.ora"
+    ports:
+      - "7890"
+    depends_on:
+      - oracle19
+
+  protheus:
+    build: ../../images/protheus
+    command: ["bash", "/local/tools/protheus.sh"]
+    environment:
+      - TOTVS_HOME=/local/data/totvs/
+      - PROTHEUS_HOME=/local/data/totvs/protheus/
+      - APPSERVER_HOME=/local/data/totvs/appserver/
+      - DBSERVER=dbaccess
+      - DBPORT=7890
+      - DBDATABASE=oracle
+      - DBALIAS=1212510_bra
+    volumes:
+      - "../../:/local"
+    ports:
+      - "8080"
+    depends_on:
+      - dbaccess
+
+volumes:
+  oracle19: {}

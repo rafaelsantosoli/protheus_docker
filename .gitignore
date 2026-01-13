@@ -1,5 +1,5 @@
 downloads/
 totvs/
-docker-compose.yml
+#docker-compose.yml
 .env
-tools/environments/
+#tools/environments/
