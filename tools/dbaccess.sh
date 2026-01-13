@@ -7,20 +7,22 @@ fi
 
 cd "${DBACCESS_HOME}"
 
-(
-	set -o pipefail
+if test "${DBACCESS_DRIVER,,}" == "oracle"; then
+	(
+		set -o pipefail
 
-	cat <<-EOF | tee ${TNS_ADMIN}/tnsnames.ora
-	${DBACCESS_ALIAS}=
-	(DESCRIPTION = 
-	  (ADDRESS = (PROTOCOL = TCP)(HOST = ${DATABASE_HOST})(PORT = ${DATABASE_PORT:=1521}))
-	  (CONNECT_DATA =
-	    (SERVER = DEDICATED)
-	    (SERVICE_NAME = ${ORACLE_PDB})
-	  )
+		cat <<-EOF | tee ${TNS_ADMIN}/tnsnames.ora
+		${DBACCESS_ALIAS}=
+		(DESCRIPTION = 
+		  (ADDRESS = (PROTOCOL = TCP)(HOST = ${DATABASE_HOST})(PORT = ${DATABASE_PORT:=1521}))
+		  (CONNECT_DATA =
+		    (SERVER = DEDICATED)
+		    (SERVICE_NAME = ${ORACLE_PDB})
+		  )
+		)
+		EOF
 	)
-	EOF
-)
+fi
 
 (
 	while read driver; do
@@ -69,7 +71,7 @@ cd "${DBACCESS_HOME}"
 	fi
 )
 
-rm dbaccess.ini || true
+rm dbaccess.ini 2>/dev/null || true
 ../tools/dbaccesscfg \
 	-u ${DATABASE_USER} \
 	-p ${DATABASE_PASS} \

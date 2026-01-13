@@ -25,10 +25,16 @@ services:
     environment:
       - TOTVS_HOME=/local/data/totvs/
       - DBACCESS_HOME=/local/data/totvs/dbaccess/multi/
-      - LICENSE_SERVER=${LICENSE_SERVER:-localhost}
-      - LICENSE_PORT=${LICENSE_PORT:-5555}
+      - LICENSE_SERVER=licensedev.engpro.totvs.com.br
+      - LICENSE_PORT=8850
       - DBACCESS_DRIVER=oracle
       - DBACCESS_ALIAS=1212510_bra
+      - DATABASE_HOST=oracle19
+      - DATABASE_PORT=1521
+      - DATABASE_USER=p1212510mntdbexp
+      - DATABASE_PASS=Protheus.123
+      - DATABASE_NAME=p1212510mntdbexp
+      - ORACLE_PDB=ORACLEPDB1
     volumes:
       - "../../:/local"
       - "../../data/totvs/dbaccess/configures/odbc.ini:/etc/odbc.ini"
@@ -49,6 +55,8 @@ services:
       - DBPORT=7890
       - DBDATABASE=oracle
       - DBALIAS=1212510_bra
+      - LICENSE_SERVER=licensedev.engpro.totvs.com.br
+      - LICENSE_PORT=8850
     volumes:
       - "../../:/local"
     ports:

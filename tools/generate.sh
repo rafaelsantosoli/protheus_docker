@@ -21,9 +21,18 @@ fi
 source "${CONFIG_FILE}"
 
 case "${BANCO_DE_DADOS}" in
-    postgres15|postgres16) dbdatabase="postgres" ;;
-    mssql2019|mssql2022)   dbdatabase="mssql" ;;
-    oracle19)              dbdatabase="oracle" ;;
+    postgres15|postgres16)
+        dbdatabase="postgres" 
+        database_port="5432"
+        ;;
+    mssql2019|mssql2022)   
+        dbdatabase="mssql" 
+        database_port="1433"
+        ;;
+    oracle19)              
+        dbdatabase="oracle"
+        database_port="1521"
+        ;;
 esac
 
 case "${IDIOMA}" in
@@ -189,10 +198,16 @@ cat <<-EOF
     environment:
       - TOTVS_HOME=/local/data/totvs/
       - DBACCESS_HOME=/local/data/totvs/dbaccess/multi/
-      - LICENSE_SERVER=\${LICENSE_SERVER:-localhost}
-      - LICENSE_PORT=\${LICENSE_PORT:-5555}
+      - LICENSE_SERVER=${LICENSE_SERVER:-localhost}
+      - LICENSE_PORT=${LICENSE_PORT:-5555}
       - DBACCESS_DRIVER=${dbdatabase}
       - DBACCESS_ALIAS=${dbalias}
+      - DATABASE_HOST=${BANCO_DE_DADOS}
+      - DATABASE_PORT=${database_port}
+      - DATABASE_USER=${database_user}
+      - DATABASE_PASS=Protheus.123
+      - DATABASE_NAME=${congelada_nome}
+      - ORACLE_PDB=${ORACLE_PDB}
     volumes:
       - "../../:/local"
       - "../../data/totvs/dbaccess/configures/odbc.ini:/etc/odbc.ini"
@@ -213,6 +228,8 @@ cat <<-EOF
       - DBPORT=7890
       - DBDATABASE=${dbdatabase}
       - DBALIAS=${dbalias}
+      - LICENSE_SERVER=${LICENSE_SERVER:-localhost}
+      - LICENSE_PORT=${LICENSE_PORT:-5555}
     volumes:
       - "../../:/local"
     ports:
