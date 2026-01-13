@@ -75,10 +75,27 @@ docker-compose exec oracle19 bash /local/tools/oracle_impdp.sh
 ### 5. Verificar logs
 
 ```sh
-docker-compose logs -f protheus
-docker-compose logs -f dbaccess
-docker-compose logs -f oracle19  # ou postgres16, mssql2022
+docker compose logs -f protheus
+docker compose logs -f dbaccess
+docker compose logs -f oracle19  # ou postgres16, mssql2022
 ```
+
+### Exec e acesso ao container
+
+Para abrir um shell ou rodar comandos dentro do container use o nome do serviço com `docker compose exec` ou o nome do container com `docker exec`.
+
+Exemplos:
+
+```sh
+# com docker compose (serviço):
+docker compose exec protheus bash
+
+# com docker (container):
+docker exec -it oracle_dev-protheus-1 bash
+```
+
+Observação: `docker compose exec <container-name>` não funciona — o primeiro argumento é o NOME DO SERVIÇO definido no compose (ex.: `protheus`, `dbaccess`).
+
 
 ## Variáveis de Ambiente
 

@@ -229,12 +229,17 @@ cat <<-EOF
       - "../../data/totvs/dbaccess/configures/tnsnames.ora:/opt/oracle/instantclient_21_5/network/admin/tnsnames.ora"
     ports:
       - "7890"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     depends_on:
-      - ${BANCO_DE_DADOS}
+      ${BANCO_DE_DADOS}:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "pgrep -x dbaccess64 > /dev/null || exit 1"]
       interval: 20s
-      retries: 3
+      retries: 5
       start_period: 30s
 
   protheus:
@@ -254,15 +259,21 @@ cat <<-EOF
       - "../../:/local"
     ports:
       - "8086"
+      - "1234"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     depends_on:
-      - dbaccess
+      dbaccess:
+        condition: service_healthy
     extra_hosts:
       - "licensedba.engpro.totvs.com.br:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f appsrvlinux > /dev/null || exit 1"]
       interval: 20s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
 
 volumes:
 EOF
