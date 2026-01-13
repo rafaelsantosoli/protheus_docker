@@ -21,10 +21,20 @@ export LICENSE_PORT=8850
 docker-compose up -d --build
 
 # entrar no container do banco para criar banco inicial
+#Se caso esteja usando o postgres:
 docker-compose exec postgres16 bash /local/tools/postgres_create_database.sh
+#Se caso esteja usando o mssql (verifique o nome do servico no docker-compose.yml, ex: mssql2022):
+docker-compose exec mssql2022 bash /local/tools/mssql_create_database.sh
+#Se caso esteja usando o oracle:
+docker-compose exec oracle19 bash /local/tools/oracle_create_database.sh
 
 # caso queira restaurar o banco de dados da base congelada
+#Se caso esteja usando o postgres:
 docker-compose exec postgres16 bash /local/tools/postgres_pgrestore.sh
+#Se caso esteja usando o mssql (verifique o nome do servico no docker-compose.yml):
+docker-compose exec mssql2022 bash /local/tools/mssql_restore_database.sh
+#Se caso esteja usando o oracle:
+docker-compose exec oracle19 bash /local/tools/oracle_impdp.sh
 
 # para consultar as portas do ambiente:
 docker ps
