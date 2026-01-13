@@ -138,6 +138,11 @@ case "${BANCO_DE_DADOS}" in
 		        limits:
 		          cpus: 2
 		          memory: 2GB
+		    healthcheck:
+		      test: ["CMD-SHELL", "pg_isready -U postgres || exit 1"]
+		      interval: 30s
+		      retries: 3
+		      start_period: 20s
 		EOF
 		;;
 	postgres16)
@@ -159,6 +164,11 @@ case "${BANCO_DE_DADOS}" in
 		        limits:
 		          cpus: 2
 		          memory: 2GB
+		    healthcheck:
+		      test: ["CMD-SHELL", "pg_isready -U postgres || exit 1"]
+		      interval: 30s
+		      retries: 3
+		      start_period: 20s
 		EOF
 		;;
 	oracle19)
@@ -187,6 +197,11 @@ case "${BANCO_DE_DADOS}" in
 		        limits:
 		          cpus: 2
 		          memory: 6GB
+		    healthcheck:
+	      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -S sys/Oracle.123@localhost:1521/ORACLEPDB1 as sysdba | awk 'NR==2 {exit ($1==1)?0:1}'"]
+		      interval: 30s
+		      retries: 5
+		      start_period: 120s
 		EOF
 		;;
 esac
@@ -216,6 +231,11 @@ cat <<-EOF
       - "7890"
     depends_on:
       - ${BANCO_DE_DADOS}
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -x dbaccess64 > /dev/null || exit 1"]
+      interval: 20s
+      retries: 3
+      start_period: 30s
 
   protheus:
     build: ../../images/protheus
@@ -233,9 +253,16 @@ cat <<-EOF
     volumes:
       - "../../:/local"
     ports:
-      - "8080"
+      - "8086"
     depends_on:
       - dbaccess
+    extra_hosts:
+      - "licensedba.engpro.totvs.com.br:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f appsrvlinux > /dev/null || exit 1"]
+      interval: 20s
+      retries: 3
+      start_period: 40s
 
 volumes:
 EOF

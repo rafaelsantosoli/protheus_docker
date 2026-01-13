@@ -1,5 +1,22 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+# Funções de log estruturado
+log_info() {
+    echo "ℹ️  $*"
+}
+
+log_success() {
+    echo "✅ $*"
+}
+
+log_error() {
+    echo "❌ ERRO: $*" >&2
+}
+
+log_warning() {
+    echo "⚠️  AVISO: $*"
+}
 
 # Tenta carregar variáveis do arquivo .env na raiz do projeto
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,7 +36,7 @@ fi
 
 # Verifica credenciais do ARTE
 if [ -z "$ARTE_USER" ] || [ -z "$ARTE_PASS" ]; then
-    echo "Erro: As variáveis de ambiente ARTE_USER e ARTE_PASS precisam estar definidas."
+    log_error "As variáveis de ambiente ARTE_USER e ARTE_PASS precisam estar definidas."
     exit 1
 fi
 

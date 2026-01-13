@@ -19,14 +19,19 @@ services:
         limits:
           cpus: 2
           memory: 6GB
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -S sys/Oracle.123@localhost:1521/ORACLEPDB1 as sysdba | awk 'NR==2 {exit (oracle_dev==1)?0:1}'"]
+      interval: 30s
+      retries: 5
+      start_period: 120s
   dbaccess:
     build: ../../images/dbaccess
     command: ["bash", "/local/tools/dbaccess.sh"]
     environment:
       - TOTVS_HOME=/local/data/totvs/
       - DBACCESS_HOME=/local/data/totvs/dbaccess/multi/
-      - LICENSE_SERVER=licensedev.engpro.totvs.com.br
-      - LICENSE_PORT=8850
+      - LICENSE_SERVER=licensedba.engpro.totvs.com.br
+      - LICENSE_PORT=5555
       - DBACCESS_DRIVER=oracle
       - DBACCESS_ALIAS=1212510_bra
       - DATABASE_HOST=oracle19
@@ -41,8 +46,17 @@ services:
       - "../../data/totvs/dbaccess/configures/tnsnames.ora:/opt/oracle/instantclient_21_5/network/admin/tnsnames.ora"
     ports:
       - "7890"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     depends_on:
       - oracle19
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -x dbaccess64 > /dev/null || exit 1"]
+      interval: 20s
+      retries: 3
+      start_period: 30s
 
   protheus:
     build: ../../images/protheus
@@ -55,14 +69,26 @@ services:
       - DBPORT=7890
       - DBDATABASE=oracle
       - DBALIAS=1212510_bra
-      - LICENSE_SERVER=licensedev.engpro.totvs.com.br
-      - LICENSE_PORT=8850
+      - LICENSE_SERVER=licensedba.engpro.totvs.com.br
+      - LICENSE_PORT=5555
     volumes:
       - "../../:/local"
     ports:
-      - "8080"
+      - "8086"
+      - "1234"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     depends_on:
       - dbaccess
+    extra_hosts:
+      - "licensedba.engpro.totvs.com.br:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f appsrvlinux > /dev/null || exit 1"]
+      interval: 20s
+      retries: 3
+      start_period: 40s
 
 volumes:
   oracle19: {}

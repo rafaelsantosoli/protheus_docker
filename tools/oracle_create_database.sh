@@ -1,5 +1,40 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+# Funções de log estruturado
+log_info() {
+    echo "ℹ️  $*"
+}
+
+log_success() {
+    echo "✅ $*"
+}
+
+log_error() {
+    echo "❌ ERRO: $*" >&2
+}
+
+log_warning() {
+    echo "⚠️  AVISO: $*"
+}
+
+# Função para validar variáveis de ambiente
+check_env_var() {
+    local var_name=$1
+    if [[ -z "${!var_name:-}" ]]; then
+        log_error "Variável de ambiente '${var_name}' não está definida."
+        exit 1
+    fi
+}
+
+# Validação de variáveis críticas
+check_env_var "ORACLE_PWD"
+check_env_var "ORACLE_PDB"
+check_env_var "DATABASE_USER"
+check_env_var "DATABASE_PASS"
+check_env_var "DATABASE_NAME"
+
+echo "ℹ️  Criando estrutura de banco Oracle..."
 
 #FEITO
 #CREATE OR REPLACE DIRECTORY "${meta.templateName}" AS '${meta.templatePath}'

@@ -1,52 +1,162 @@
 # Protheus-dev
 
-Ambiente de desenvolvimento totalmente integrado, usando Docker.
+Ambiente de desenvolvimento totalmente integrado para TOTVS Protheus, usando Docker.
+
+## 📋 Índice
+
+- [Como usar](#como-usar)
+- [Variáveis de Ambiente](#variáveis-de-ambiente)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Troubleshooting](#troubleshooting)
+- [Roadmap](#roadmap)
 
 ## Como usar
 
-Fazer o backup desse repositorio com um nome qualquer
+### 1. Configuração Inicial
 
 ```sh
-# fazer o download dos artefatos
-bash tools/setup.sh
+# fazer o download dos artefatos (modo interativo)
+bash tools/setup.sh create meu_ambiente
 
-# gerar o docker-compose para os artefatos
-bash tools/generate.sh
+# OU modo atualização (para ambientes existentes)
+bash tools/setup.sh update meu_ambiente
 
-# informar qual license server sera utilizado
-export LICENSE_SERVER=licensedev.engpro.totvs.com.br
-export LICENSE_PORT=8850
-
-# iniciar o ambiente
-docker-compose up -d --build
-
-# entrar no container do banco para criar banco inicial
-#Se caso esteja usando o postgres:
-docker-compose exec postgres16 bash /local/tools/postgres_create_database.sh
-#Se caso esteja usando o mssql (verifique o nome do servico no docker-compose.yml, ex: mssql2022):
-docker-compose exec mssql2022 bash /local/tools/mssql_create_database.sh
-#Se caso esteja usando o oracle:
-docker-compose exec oracle19 bash /local/tools/oracle_create_database.sh
-
-# caso queira restaurar o banco de dados da base congelada
-#Se caso esteja usando o postgres:
-docker-compose exec postgres16 bash /local/tools/postgres_pgrestore.sh
-#Se caso esteja usando o mssql (verifique o nome do servico no docker-compose.yml):
-docker-compose exec mssql2022 bash /local/tools/mssql_restore_database.sh
-#Se caso esteja usando o oracle:
-docker-compose exec oracle19 bash /local/tools/oracle_impdp.sh
-
-# para consultar as portas do ambiente:
-docker ps
-
-# parabens! seu ambiente esta (ou pelo menos deveria) funcionando!
+# gerar o docker-compose para o ambiente
+bash tools/generate.sh meu_ambiente
 ```
 
-Caso você precise verificar algum problema no ambiente:
+### 2. Configurar variáveis de ambiente
+
+Edite o arquivo `environments/meu_ambiente/config.env` para ajustar:
+- `LICENSE_SERVER`: Servidor de licenças
+- `LICENSE_PORT`: Porta do servidor de licenças
+
+### 3. Iniciar o ambiente
 
 ```sh
-docker-compose logs protheus
-docker-compose logs dbaccess
+cd environments/meu_ambiente
+
+# iniciar todos os serviços
+docker-compose up -d --build
+
+# verificar status
+docker-compose ps
+```
+
+### 4. Criar/Restaurar Banco de Dados
+
+#### PostgreSQL
+```sh
+# criar banco inicial
+docker-compose exec postgres16 bash /local/tools/postgres_create_database.sh
+
+# restaurar base congelada
+docker-compose exec postgres16 bash /local/tools/postgres_pgrestore.sh
+```
+
+#### MSSQL (verifique o nome do serviço no docker-compose.yml)
+```sh
+# criar banco inicial
+docker-compose exec mssql2022 bash /local/tools/mssql_create_database.sh
+
+# restaurar base congelada
+docker-compose exec mssql2022 bash /local/tools/mssql_restore_database.sh
+```
+
+#### Oracle
+```sh
+# criar banco inicial
+docker-compose exec oracle19 bash /local/tools/oracle_create_database.sh
+
+# restaurar base congelada (dump)
+docker-compose exec oracle19 bash /local/tools/oracle_impdp.sh
+```
+
+### 5. Verificar logs
+
+```sh
+docker-compose logs -f protheus
+docker-compose logs -f dbaccess
+docker-compose logs -f oracle19  # ou postgres16, mssql2022
+```
+
+## Variáveis de Ambiente
+
+### Config.env (por ambiente)
+
+| Variável | Descrição | Exemplo |
+|---|---|---|
+| `RELEASE` | Versão do Protheus | `12.1.2510` |
+| `BANCO_DE_DADOS` | Tipo do banco (postgres15, postgres16, mssql2019, mssql2022, oracle19) | `oracle19` |
+| `IDIOMA` | Idioma da base (bra, esp, eng) | `bra` |
+| `LICENSE_SERVER` | Endereço do servidor de licenças | `licensedev.engpro.totvs.com.br` |
+| `LICENSE_PORT` | Porta do servidor de licenças | `8850` |
+
+### Docker Compose (gerado automaticamente)
+
+As variáveis são injetadas nos containers via `docker-compose.yml`:
+- `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASS`
+- `LICENSE_SERVER`, `LICENSE_PORT`
+- `DBSERVER`, `DBPORT`, `DBDATABASE`, `DBALIAS`
+
+## Estrutura do Projeto
+
+```
+protheus_docker/
+├── environments/          # Ambientes isolados
+│   └── <nome_ambiente>/
+│       ├── config.env
+│       └── docker-compose.yml
+├── images/                # Dockerfiles
+│   ├── dbaccess/
+│   ├── mssql2019/
+│   ├── mssql2022/
+│   ├── oracle19/
+│   ├── postgres15/
+│   ├── postgres16/
+│   └── protheus/
+├── tools/                 # Scripts de automação
+│   ├── setup.sh          # Download e extração de artefatos
+│   ├── generate.sh       # Geração de docker-compose
+│   ├── dbaccess.sh       # Inicialização DBAccess
+│   ├── protheus.sh       # Inicialização AppServer
+│   └── *_database.sh     # Scripts de banco
+└── data/                  # Dados compartilhados (binários, dumps)
+    └── totvs/
+```
+
+## Troubleshooting
+
+### Erro: "Password is empty" no DBAccess
+**Causa:** Variáveis de ambiente não carregadas no container.
+**Solução:** Regenere o docker-compose e recrie o container:
+```sh
+bash tools/generate.sh <ambiente>
+cd environments/<ambiente>
+docker-compose up -d --force-recreate dbaccess
+```
+
+### Erro: "string index out of bounds" no AppServer
+**Causa:** Parâmetros legados `MAXSTRINGSIZE` e `TOPMEMOMEGA`.
+**Solução:** Já corrigido automaticamente. Reinicie o container:
+```sh
+docker-compose restart protheus
+```
+
+### Erro: "Unable to open log file" no Oracle
+**Causa:** Permissões do diretório dumps.
+**Solução:** Já corrigido automaticamente no setup.sh. Para ambientes antigos:
+```sh
+chmod 777 data/totvs/dumps/
+chmod 644 data/totvs/dumps/*.dmp
+```
+
+### License Server vazio no appserver.ini
+**Causa:** Variável não propagada para o container.
+**Solução:** Já corrigido. Regenere o ambiente:
+```sh
+bash tools/generate.sh <ambiente>
+docker-compose up -d --force-recreate protheus
 ```
 
 ## Roadmap
