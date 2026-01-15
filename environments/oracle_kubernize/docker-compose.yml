@@ -1,0 +1,128 @@
+services:
+  oracle19:
+    build: ../../images/oracle19
+    container_name: oracle_kubernize-oracle19
+    hostname: oracle19
+    restart: unless-stopped
+    env_file:
+      - config.env
+    environment:
+      - ORACLE_SID=${ORACLE_SID}
+      - ORACLE_PDB=${ORACLE_SERVICE}
+      - ORACLE_PWD=Oracle.123
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASS=${DATABASE_PASS}
+      - DATABASE_NAME=${DATABASE_USER}
+      - TZ=America/Sao_Paulo
+    ports:
+      - "${ORACLE_PORT}:1521"
+    volumes:
+      - "../../:/local"
+      - oracle_data:/opt/oracle/oradata
+    networks:
+      - protheus_net
+    deploy:
+      resources:
+        limits:
+          cpus: 2
+          memory: 6GB
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -S sys/Oracle.123@localhost:1521/ORACLEPDB1 as sysdba | awk 'NR==2 {if($$1==1) exit 0; else exit 1}'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  dbaccess:
+    image: ${DBACCESS_IMAGE}
+    container_name: oracle_kubernize-dbaccess
+    hostname: dbaccess
+    restart: unless-stopped
+    env_file:
+      - config.env
+    depends_on:
+      oracle19:
+        condition: service_healthy
+    environment:
+      - TZ=America/Sao_Paulo
+      - LC_ALL=pt_BR
+      - LICENSE_SERVER=${LICENSE_SERVER}
+      - LICENSE_PORT=${LICENSE_PORT}
+      - DBACCESS_DATABASE=ORACLE
+      - DBACCESS_ALIAS=${DBACCESS_ALIAS}
+      - ORACLE_SERVER=oracle19
+      - ORACLE_PORT=${ORACLE_PORT}
+      - ORACLE_USER=${DATABASE_USER}
+      - ORACLE_PASS=${DATABASE_PASS}
+      - ORACLE_SERVICE=${ORACLE_SERVICE}
+      - LOCK_NUM_ON_DB=1
+      - UPDATE_FLAG=0
+    ports:
+      - "${DBACCESS_PORT}:7890"
+    volumes:
+      - dbaccess_data:/opt/totvs/dbaccess/volume
+    networks:
+      - protheus_net
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "dbaccess64"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  protheus:
+    image: ${PROTHEUS_IMAGE}
+    container_name: oracle_kubernize-protheus
+    hostname: protheus
+    restart: unless-stopped
+    env_file:
+      - config.env
+    depends_on:
+      dbaccess:
+        condition: service_healthy
+    environment:
+      - TZ=America/Sao_Paulo
+      - LC_ALL=pt_BR
+      - LICENSE_SERVER=${LICENSE_SERVER}
+      - LICENSE_PORT=${LICENSE_PORT}
+      - DBACCESS_DATABASE=ORACLE
+      - DBACCESS_SERVER=dbaccess
+      - DBACCESS_PORT=${DBACCESS_PORT}
+      - DBACCESS_ALIAS=${DBACCESS_ALIAS}
+      - LOCK_NUM_ON_DB=1
+    ports:
+      - "${PROTHEUS_PORT}:1234"
+      - "${WEBAPP_PORT}:8080"
+    volumes:
+      - protheus_data:/opt/totvs/protheus/volume
+      - ../../data/totvs/protheus/apo:/opt/totvs/protheus/volume/current/apo:rw
+    networks:
+      - protheus_net
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    extra_hosts:
+      - "${LICENSE_SERVER}:host-gateway"
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "appsrvlinux"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+networks:
+  protheus_net:
+    driver: bridge
+
+volumes:
+  oracle_data:
+    driver: local
+  dbaccess_data:
+    driver: local
+  protheus_data:
+    driver: local

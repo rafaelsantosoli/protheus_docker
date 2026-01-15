@@ -5,6 +5,7 @@ Ambiente de desenvolvimento totalmente integrado para TOTVS Protheus, usando Doc
 ## 📋 Índice
 
 - [Como usar](#como-usar)
+- [Modo Kubernize (Imagens Oficiais)](#modo-kubernize-imagens-oficiais)
 - [Variáveis de Ambiente](#variáveis-de-ambiente)
 - [Estrutura do Projeto](#estrutura-do-projeto)
 - [Troubleshooting](#troubleshooting)
@@ -37,10 +38,10 @@ Edite o arquivo `environments/meu_ambiente/config.env` para ajustar:
 cd environments/meu_ambiente
 
 # iniciar todos os serviços
-docker-compose up -d --build
+docker compose up -d --build
 
 # verificar status
-docker-compose ps
+docker compose ps
 ```
 
 ### 4. Criar/Restaurar Banco de Dados
@@ -48,28 +49,28 @@ docker-compose ps
 #### PostgreSQL
 ```sh
 # criar banco inicial
-docker-compose exec postgres16 bash /local/tools/postgres_create_database.sh
+docker compose exec postgres16 bash /local/tools/postgres_create_database.sh
 
 # restaurar base congelada
-docker-compose exec postgres16 bash /local/tools/postgres_pgrestore.sh
+docker compose exec postgres16 bash /local/tools/postgres_pgrestore.sh
 ```
 
 #### MSSQL (verifique o nome do serviço no docker-compose.yml)
 ```sh
 # criar banco inicial
-docker-compose exec mssql2022 bash /local/tools/mssql_create_database.sh
+docker compose exec mssql2022 bash /local/tools/mssql_create_database.sh
 
 # restaurar base congelada
-docker-compose exec mssql2022 bash /local/tools/mssql_restore_database.sh
+docker compose exec mssql2022 bash /local/tools/mssql_restore_database.sh
 ```
 
 #### Oracle
 ```sh
 # criar banco inicial
-docker-compose exec oracle19 bash /local/tools/oracle_create_database.sh
+docker compose exec oracle19 bash /local/tools/oracle_create_database.sh
 
 # restaurar base congelada (dump)
-docker-compose exec oracle19 bash /local/tools/oracle_impdp.sh
+docker compose exec oracle19 bash /local/tools/oracle_impdp.sh
 ```
 
 ### 5. Verificar logs
@@ -95,6 +96,72 @@ docker exec -it oracle_dev-protheus-1 bash
 ```
 
 Observação: `docker compose exec <container-name>` não funciona — o primeiro argumento é o NOME DO SERVIÇO definido no compose (ex.: `protheus`, `dbaccess`).
+
+## Modo Kubernize (Imagens Oficiais)
+
+Este projeto suporta o uso de **imagens Docker oficiais da TOTVS** (Kubernize), que simplificam a implantação e seguem as melhores práticas recomendadas pela engenharia Protheus.
+
+### Vantagens das Imagens Kubernize
+
+- ✅ **Homologadas pela TOTVS**: Testadas e aprovadas pela engenharia.
+- ✅ **Atualizações simplificadas**: Basta trocar a tag da imagem.
+- ✅ **Menos manutenção**: Não requer scripts customizados de inicialização.
+- ✅ **Configuração via variáveis de ambiente**: Padrão 12-factor app.
+- ✅ **Suporte a `LOCK_NUM_ON_DB`**: Controle de lock e numeração via DBAccess (obrigatório na 12.1.2510+).
+
+### Credenciais para Acesso ao Registry
+
+As imagens oficiais estão hospedadas em `docker.totvs.io` (uso interno TOTVS). Para fazer pull das imagens, configure suas credenciais:
+
+```sh
+docker login docker.totvs.io
+# Username: seu_usuario
+# Password: sua_senha
+```
+
+### Ambiente de Exemplo
+
+Um ambiente pré-configurado está disponível em `environments/oracle_kubernize/`:
+
+```sh
+cd environments/oracle_kubernize
+
+# Fazer login no registry TOTVS
+docker login docker.totvs.io
+
+# Iniciar o ambiente
+docker compose up -d
+
+# Verificar status
+docker compose ps
+
+# Acompanhar logs
+docker compose logs -f protheus
+```
+
+### Imagens Disponíveis
+
+| Serviço | Imagem | Versão |
+| --- | --- | --- |
+| Protheus | `docker.totvs.io/totvs-images/protheus` | 12.1.2510 |
+| DBAccess | `docker.totvs.io/totvs-images/dbaccess` | 12.1.2510 |
+| License Server | `docker.totvs.io/totvs-images/license` | v3.6.3_1 |
+| TSS | `docker.totvs.io/totvs-images/tss` | v12.1.2510-3.0 |
+
+### Variáveis de Ambiente (Modo Kubernize)
+
+**DBAccess:**
+- `DBACCESS_DATABASE`: Tipo de banco (`POSTGRES`, `MSSQL`, `ORACLE`)
+- `ORACLE_SERVER`, `ORACLE_PORT`, `ORACLE_USER`, `ORACLE_PASS`, `ORACLE_SERVICE`
+- `LICENSE_SERVER`, `LICENSE_PORT`
+- `LOCK_NUM_ON_DB=1`: Controle de lock via DBAccess
+
+**Protheus:**
+- `DBACCESS_SERVER`, `DBACCESS_PORT`, `DBACCESS_DATABASE`, `DBACCESS_ALIAS`
+- `LICENSE_SERVER`, `LICENSE_PORT`
+- `LOCK_NUM_ON_DB=1`: Controle de lock via DBAccess
+
+Consulte a [documentação oficial do Kubernize](Kubernize/Kubernize_-_Protheus_em_container_-_Engenharia-Segmentos.md) para mais detalhes.
 
 
 ## Variáveis de Ambiente
