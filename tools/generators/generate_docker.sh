@@ -6,8 +6,10 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
+# Updated paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+TOOLS_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$TOOLS_DIR")"
 
 ENV_NAME="$1"
 ENV_DIR="${PROJECT_ROOT}/environments/${ENV_NAME}"
@@ -22,14 +24,14 @@ source "${CONFIG_FILE}"
 
 case "${BANCO_DE_DADOS}" in
     postgres15|postgres16)
-        dbdatabase="postgres" 
+        dbdatabase="postgres"
         database_port="5432"
         ;;
-    mssql2019|mssql2022)   
-        dbdatabase="mssql" 
+    mssql2019|mssql2022)
+        dbdatabase="mssql"
         database_port="1433"
         ;;
-    oracle19)              
+    oracle19)
         dbdatabase="oracle"
         database_port="1521"
         ;;
@@ -206,7 +208,84 @@ case "${BANCO_DE_DADOS}" in
 		;;
 esac
 
-cat <<-EOF
+# Determine Image Source and Mode
+env_type="${ENV_TYPE:-custom}"
+
+if [ "$env_type" == "kubernize" ]; then
+    # KUBERNIZE MODE (Official Images)
+    # Tag logic: Use release (e.g. 12.1.2410) + suffix if needed.
+    # Setup wizard saves full RELEASE, e.g. 12.1.2410.
+    # We will assume "published" tag (release number only) or add -latest if requested?
+    # Setup said "expedicao" (next, latest, published).
+    # If expedicao is published, tag is 12.1.2410.
+    # If latest, 12.1.2410-latest.
+
+    IMG_TAG="${RELEASE}"
+    if [ "${EXPEDICAO}" != "published" ]; then
+        IMG_TAG="${RELEASE}-${EXPEDICAO}"
+    fi
+
+    # DBAccess Image
+    DBACCESS_IMAGE="docker.totvs.io/totvs-images/dbaccess:${IMG_TAG}"
+    # Protheus Image
+    PROTHEUS_IMAGE="docker.totvs.io/totvs-images/protheus:${IMG_TAG}"
+    # License Server (Fixed version usually, or variable?)
+    LICENSE_IMAGE="docker.totvs.io/totvs-images/license:v3.6.3_1"
+
+    cat <<-EOF
+  dbaccess:
+    image: ${DBACCESS_IMAGE}
+    environment:
+      - LICENSE_SERVER=${LICENSE_SERVER:-localhost}
+      - LICENSE_PORT=${LICENSE_PORT:-5555}
+      - DBACCESS_DATABASE=${DBACCESS_DATABASE:-POSTGRES}
+      - DBACCESS_ALIAS=${dbalias}
+      - POSTGRES_SERVER=${BANCO_DE_DADOS}
+      - POSTGRES_PORT=${database_port}
+      - POSTGRES_DATABASE=${database_user}
+      - POSTGRES_USER=${database_user}
+      - POSTGRES_PASS=Protheus.123
+      - MSSQL_SERVER=${BANCO_DE_DADOS}
+      - MSSQL_PORT=${database_port}
+      - MSSQL_DATABASE=${database_user}
+      - MSSQL_USER=${database_user}
+      - MSSQL_PASS=Protheus.123
+      - ORACLE_SERVER=${BANCO_DE_DADOS}
+      - ORACLE_PORT=${database_port}
+      - ORACLE_USER=${database_user}
+      - ORACLE_PASS=Protheus.123
+      - LOCK_NUM_ON_DB=1
+    ports:
+      - "7890"
+    depends_on:
+      ${BANCO_DE_DADOS}:
+        condition: service_healthy
+
+  protheus:
+    image: ${PROTHEUS_IMAGE}
+    environment:
+      - LICENSE_SERVER=${LICENSE_SERVER:-localhost}
+      - LICENSE_PORT=${LICENSE_PORT:-5555}
+      - DBACCESS_SERVER=dbaccess
+      - DBACCESS_PORT=7890
+      - DBACCESS_DATABASE=${DBACCESS_DATABASE:-POSTGRES}
+      - DBACCESS_ALIAS=${dbalias}
+      - LOCK_NUM_ON_DB=1
+    volumes:
+      # Map local data structure to Kubernize volume structure
+      # Local: data/totvs/protheus/apo -> Container: /opt/totvs/protheus/volume/current/apo
+      - "../../data/totvs/protheus:/opt/totvs/protheus/volume/current"
+    ports:
+      - "8086:8080" # Kubernize works on 8080 internal
+      - "1234"
+    depends_on:
+      dbaccess:
+        condition: service_healthy
+EOF
+
+else
+    # CUSTOM MODE (Legacy)
+    cat <<-EOF
   dbaccess:
     build: ../../images/dbaccess
     command: ["bash", "/local/tools/dbaccess.sh"]
@@ -274,7 +353,9 @@ cat <<-EOF
       interval: 20s
       retries: 5
       start_period: 60s
-
+EOF
+fi
+cat <<-EOF
 volumes:
 EOF
 

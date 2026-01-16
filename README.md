@@ -13,17 +13,18 @@ Ambiente de desenvolvimento totalmente integrado para TOTVS Protheus, usando Doc
 
 ## Como usar
 
-### 1. Configuração Inicial
+> 📘 **Documentação Completa**: Consulte o [MANUAL.md](MANUAL.md) para um guia detalhado de todos os comandos e fluxos.
 
+### 1. Configuração (Novo CLI Unificado)
 ```sh
-# fazer o download dos artefatos (modo interativo)
-bash tools/setup.sh create meu_ambiente
+# Adicionar tools/cli ao PATH (opcional, ou execute direto)
+export PATH=$PATH:$(pwd)/tools/cli
 
-# OU modo atualização (para ambientes existentes)
-bash tools/setup.sh update meu_ambiente
+# Inicializar novo ambiente (Wizard suporta Custom e Kubernize)
+protheus init meu_ambiente
 
-# gerar o docker-compose para o ambiente
-bash tools/generate.sh meu_ambiente
+# Gerar configuração (Docker)
+protheus generate meu_ambiente
 ```
 
 ### 2. Configurar variáveis de ambiente
@@ -34,14 +35,12 @@ Edite o arquivo `environments/meu_ambiente/config.env` para ajustar:
 
 ### 3. Iniciar o ambiente
 
+### 3. Iniciar o ambiente
 ```sh
-cd environments/meu_ambiente
-
-# iniciar todos os serviços
-docker compose up -d --build
+protheus up meu_ambiente
 
 # verificar status
-docker compose ps
+protheus ps meu_ambiente
 ```
 
 ### 4. Criar/Restaurar Banco de Dados
@@ -49,28 +48,28 @@ docker compose ps
 #### PostgreSQL
 ```sh
 # criar banco inicial
-docker compose exec postgres16 bash /local/tools/postgres_create_database.sh
+docker compose exec postgres16 bash /local/tools/database/postgres_create_database.sh
 
 # restaurar base congelada
-docker compose exec postgres16 bash /local/tools/postgres_pgrestore.sh
+docker compose exec postgres16 bash /local/tools/database/postgres_pgrestore.sh
 ```
 
 #### MSSQL (verifique o nome do serviço no docker-compose.yml)
 ```sh
 # criar banco inicial
-docker compose exec mssql2022 bash /local/tools/mssql_create_database.sh
+docker compose exec mssql2022 bash /local/tools/database/mssql_create_database.sh
 
 # restaurar base congelada
-docker compose exec mssql2022 bash /local/tools/mssql_restore_database.sh
+docker compose exec mssql2022 bash /local/tools/database/mssql_restore_database.sh
 ```
 
 #### Oracle
 ```sh
 # criar banco inicial
-docker compose exec oracle19 bash /local/tools/oracle_create_database.sh
+docker compose exec oracle19 bash /local/tools/database/oracle_create_database.sh
 
 # restaurar base congelada (dump)
-docker compose exec oracle19 bash /local/tools/oracle_impdp.sh
+docker compose exec oracle19 bash /local/tools/database/oracle_impdp.sh
 ```
 
 ### 5. Verificar logs

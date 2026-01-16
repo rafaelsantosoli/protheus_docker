@@ -19,8 +19,11 @@ log_warning() {
 }
 
 # Tenta carregar variáveis do arquivo .env na raiz do projeto
+# Tenta carregar variáveis do arquivo .env na raiz do projeto
+# Updated paths for new location: tools/cli/setup_wizard.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+TOOLS_DIR="$(dirname "$SCRIPT_DIR")"       # tools/
+PROJECT_ROOT="$(dirname "$TOOLS_DIR")"     # root/
 
 if [ -f "$PROJECT_ROOT/.env" ]; then
     set -a
@@ -64,6 +67,24 @@ if [ "$MODE" == "create" ]; then
     ENV_DIR="${PROJECT_ROOT}/environments/${env_name}"
     mkdir -p "$ENV_DIR"
     echo "Configurando ambiente em: $ENV_DIR"
+
+    mkdir -p "$ENV_DIR"
+    echo "Configurando ambiente em: $ENV_DIR"
+
+    # X. Seleção de Modo
+    printf "Qual modo de ambiente deseja criar?\n"
+    select mode_env in "Custom (Compilação Local - Legado)" "Kubernize (Imagens Oficiais TOTVS)"; do
+        if [ "$REPLY" == "1" ]; then
+             env_type="custom"
+             break
+        elif [ "$REPLY" == "2" ]; then
+             env_type="kubernize"
+             break
+        else
+             printf "Opção inválida!\n"
+        fi
+    done
+    echo "Modo selecionado: $env_type"
 
     # 2. Seleção de Opções
     printf "Qual release do Protheus deseja utilizar?\n"
@@ -124,21 +145,25 @@ DATABASE_FILE=${database}
 TIPO_CONGELADA=${tipo_congelada}
 TIPO_PROTHEUS=${tipo_protheus}
 COMPOSE_PROJECT_NAME=${env_name}
+TIPO_CONGELADA=${tipo_congelada}
+TIPO_PROTHEUS=${tipo_protheus}
+COMPOSE_PROJECT_NAME=${env_name}
+ENV_TYPE=${env_type}
 EOF
 
 else
     # MODO UPDATE
     ENV_DIR="${PROJECT_ROOT}/environments/${env_name}"
     CONFIG_FILE="${ENV_DIR}/config.env"
-    
+
     if [ ! -f "$CONFIG_FILE" ]; then
         echo "Erro: Configuração não encontrada em $CONFIG_FILE"
         exit 1
     fi
-    
+
     echo "Carregando configurações existentes..."
     source "$CONFIG_FILE"
-    
+
     # Mapeia variáveis do config (Maiúsculas) para variáveis locais (Minúsculas) usadas no download
     release="$RELEASE"
     banco_de_dados="$BANCO_DE_DADOS"
@@ -185,6 +210,11 @@ download_and_extract() {
     dest_file="$2"
     extract_dest="$3"
     type="$4" # tar, zip, cp, custom_dump
+    tipo_congelada="$TIPO_CONGELADA"
+    tipo_protheus="$TIPO_PROTHEUS"
+    # Default for old configs
+    env_type="${ENV_TYPE:-custom}"
+fi
 
     filename=$(basename "$dest_file")
     echo "--------------------------------------------------"
@@ -239,32 +269,38 @@ download_and_extract() {
 
 echo "Verificando e baixando artefatos..."
 
-# AppServer
-download_and_extract "${APPSERVER_URL}" \
-    "${PROJECT_ROOT}/data/downloads/appserver.tar.gz" \
-    "${PROJECT_ROOT}/data/totvs/appserver/" \
-    "tar"
+if [ "$env_type" == "custom" ]; then
+    echo ">> Modo CUSTOM: Baixando binários do AppServer e DBAccess..."
 
-# WebApp
-download_and_extract "${WEBAPP_URL}" \
-    "${PROJECT_ROOT}/data/downloads/webapp.tar.gz" \
-    "${PROJECT_ROOT}/data/totvs/appserver/" \
-    "tar"
+    # AppServer
+    download_and_extract "${APPSERVER_URL}" \
+        "${PROJECT_ROOT}/data/downloads/appserver.tar.gz" \
+        "${PROJECT_ROOT}/data/totvs/appserver/" \
+        "tar"
 
-# PDF Printer
-download_and_extract "${PDFPRINTER_URL}" \
-    "${PROJECT_ROOT}/data/downloads/pdfprinter.tar.gz" \
-    "${PROJECT_ROOT}/data/totvs/appserver/" \
-    "tar"
+    # WebApp
+    download_and_extract "${WEBAPP_URL}" \
+        "${PROJECT_ROOT}/data/downloads/webapp.tar.gz" \
+        "${PROJECT_ROOT}/data/totvs/appserver/" \
+        "tar"
 
-# DBAccess
-download_and_extract "${DBACCESS_URL}" \
-    "${PROJECT_ROOT}/data/downloads/dbaccess.tar.gz" \
-    "${PROJECT_ROOT}/data/totvs/dbaccess/" \
-    "tar"
+    # PDF Printer
+    download_and_extract "${PDFPRINTER_URL}" \
+        "${PROJECT_ROOT}/data/downloads/pdfprinter.tar.gz" \
+        "${PROJECT_ROOT}/data/totvs/appserver/" \
+        "tar"
 
-# Copia dbapi.so (sempre necessário se dbaccess mudar)
-cp "${PROJECT_ROOT}/data/totvs/dbaccess/client/dbapi.so" "${PROJECT_ROOT}/data/totvs/appserver/"
+    # DBAccess
+    download_and_extract "${DBACCESS_URL}" \
+        "${PROJECT_ROOT}/data/downloads/dbaccess.tar.gz" \
+        "${PROJECT_ROOT}/data/totvs/dbaccess/" \
+        "tar"
+
+    # Copia dbapi.so (sempre necessário se dbaccess mudar)
+    cp "${PROJECT_ROOT}/data/totvs/dbaccess/client/dbapi.so" "${PROJECT_ROOT}/data/totvs/appserver/"
+else
+    echo ">> Modo KUBERNIZE: Pulando download de binários (usará Imagens Oficiais)."
+fi
 
 # RPO
 rpo_file_local=`basename ${PROTHEUS_URL}`
@@ -315,4 +351,5 @@ download_and_extract "${PROTHEUSDATA_URL}" \
     "zip"
 
 echo "Setup concluído para o ambiente: $env_name"
-echo "Próximo passo: Executar o generate.sh $env_name"
+echo "Setup concluído para o ambiente: $env_name ($env_type)"
+echo "Próximo passo: Executar o comando: tools/cli/protheus generate $env_name"

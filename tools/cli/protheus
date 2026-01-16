@@ -1,0 +1,110 @@
+#!/bin/bash
+set -e
+
+# Resolve paths
+CLI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOOLS_DIR="$(dirname "$CLI_DIR")"
+PROJECT_ROOT="$(dirname "$TOOLS_DIR")"
+ENV_ROOT="${PROJECT_ROOT}/environments"
+
+# Helpher functions
+help() {
+    echo "Usage: protheus <command> [args]"
+    echo ""
+    echo "Commands:"
+    echo "  init <env_name>       Create a new environment (wizard)"
+    echo "  generate <env_name>   Generate configuration (docker-compose.yml or kubernetes.yaml)"
+    echo "    --target <docker|k8s> (default: docker)"
+    echo "  up <env_name>         Start the environment (Docker Compose)"
+    echo "  down <env_name>       Stop the environment"
+    echo "  shell <env_name> <svc> Open a shell in a service container"
+    echo "  logs <env_name> <svc>  View logs"
+    echo ""
+    exit 1
+}
+
+if [ -z "$1" ]; then
+    help
+fi
+
+CMD="$1"
+ENV_NAME="$2"
+
+if [ "$CMD" == "init" ]; then
+    if [ -z "$ENV_NAME" ]; then
+        echo "Error: Environment name required."
+        exit 1
+    fi
+    # Call the setup wizard
+    bash "${CLI_DIR}/setup_wizard.sh" create "$ENV_NAME"
+    exit 0
+fi
+
+if [ -z "$ENV_NAME" ]; then
+    echo "Error: Environment name required for command '$CMD'."
+    exit 1
+fi
+
+ENV_DIR="${ENV_ROOT}/${ENV_NAME}"
+if [ ! -d "$ENV_DIR" ]; then
+    echo "Error: Environment '$ENV_NAME' not found at $ENV_DIR"
+    exit 1
+fi
+
+case "$CMD" in
+    generate)
+        TARGET="docker"
+        if [ "$3" == "--target" ] && [ -n "$4" ]; then
+            TARGET="$4"
+        fi
+
+        if [ "$TARGET" == "docker" ]; then
+            bash "${TOOLS_DIR}/generators/generate_docker.sh" "$ENV_NAME"
+        elif [ "$TARGET" == "k8s" ]; then
+            if [ -f "${TOOLS_DIR}/generators/generate_k8s.sh" ]; then
+                bash "${TOOLS_DIR}/generators/generate_k8s.sh" "$ENV_NAME"
+            else
+                echo "Error: Kubernetes generator not implemented yet."
+                exit 1
+            fi
+        else
+            echo "Error: Unknown target '$TARGET'"
+            exit 1
+        fi
+        ;;
+    up)
+        cd "$ENV_DIR"
+        docker compose up -d
+        ;;
+    down)
+        cd "$ENV_DIR"
+        docker compose down
+        ;;
+    restart)
+        cd "$ENV_DIR"
+        docker compose restart
+        ;;
+    ps)
+        cd "$ENV_DIR"
+        docker compose ps
+        ;;
+    logs)
+        SVC="${3:-}"
+        cd "$ENV_DIR"
+        docker compose logs -f "$SVC"
+        ;;
+    shell)
+        SVC="$3"
+        if [ -z "$SVC" ]; then
+             echo "Error: Service name required (e.g., protheus, dbaccess, oracle19, postgres16)"
+             exit 1
+        fi
+        cd "$ENV_DIR"
+        # Try to find the container name
+        # docker compose exec requires service name
+        docker compose exec "$SVC" bash || docker compose exec "$SVC" sh
+        ;;
+    *)
+        help
+        ;;
+esac
