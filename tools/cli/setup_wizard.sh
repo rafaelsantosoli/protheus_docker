@@ -31,11 +31,7 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
     set +a
 fi
 
-if [ -f "$PROJECT_ROOT/.env" ]; then
-    set -a
-    source "$PROJECT_ROOT/.env"
-    set +a
-fi
+
 
 # Verifica credenciais do ARTE
 if [ -z "$ARTE_USER" ] || [ -z "$ARTE_PASS" ]; then
@@ -68,8 +64,7 @@ if [ "$MODE" == "create" ]; then
     mkdir -p "$ENV_DIR"
     echo "Configurando ambiente em: $ENV_DIR"
 
-    mkdir -p "$ENV_DIR"
-    echo "Configurando ambiente em: $ENV_DIR"
+
 
     # X. Seleção de Modo
     printf "Qual modo de ambiente deseja criar?\n"
@@ -210,11 +205,9 @@ download_and_extract() {
     dest_file="$2"
     extract_dest="$3"
     type="$4" # tar, zip, cp, custom_dump
-    tipo_congelada="$TIPO_CONGELADA"
-    tipo_protheus="$TIPO_PROTHEUS"
+
     # Default for old configs
     env_type="${ENV_TYPE:-custom}"
-fi
 
     filename=$(basename "$dest_file")
     echo "--------------------------------------------------"
@@ -228,6 +221,13 @@ fi
 
     # Download condicional (-z)
     echo "Downloading ${url}"
+
+    # Remove arquivo se for vazio (0 bytes) para forçar novo download
+    if [ -f "$dest_file" ] && [ ! -s "$dest_file" ]; then
+        echo " >> Arquivo vazio detectado. Removendo para baixar novamente: $dest_file"
+        rm "$dest_file"
+    fi
+
     if ! curl -u "${ARTE_USER}:${ARTE_PASS}" -L "${url}" -o "${dest_file}" -z "${dest_file}" --fail; then
         echo "Erro no download de $url"
         return 1

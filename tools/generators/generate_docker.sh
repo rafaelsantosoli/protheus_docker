@@ -260,6 +260,11 @@ if [ "$env_type" == "kubernize" ]; then
     depends_on:
       ${BANCO_DE_DADOS}:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -x dbaccess64 > /dev/null || exit 1"]
+      interval: 20s
+      retries: 5
+      start_period: 30s
 
   protheus:
     image: ${PROTHEUS_IMAGE}
@@ -275,6 +280,9 @@ if [ "$env_type" == "kubernize" ]; then
       # Map local data structure to Kubernize volume structure
       # Local: data/totvs/protheus/apo -> Container: /opt/totvs/protheus/volume/current/apo
       - "../../data/totvs/protheus:/opt/totvs/protheus/volume/current"
+    extra_hosts:
+      - "licensedba.engpro.totvs.com.br:host-gateway"
+
     ports:
       - "8086:8080" # Kubernize works on 8080 internal
       - "1234"

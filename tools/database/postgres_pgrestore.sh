@@ -18,11 +18,13 @@ select database in ${databases}; do
 done
 
 pg_restore -Fc \
-	-U postgres \
-	--role="${DATABASE_USER}" \
-	--dbname="${database}" \
-	--no-owner \
-	"${dump}"
+    -U postgres \
+    --dbname="${database}" \
+    --no-owner \
+    --no-acl \
+    --clean \
+    --if-exists \
+    "${dump}" || true
 
 #TODO: descobrir como identificar se o banco de dados possui dados.
 #	--clean \

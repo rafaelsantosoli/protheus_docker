@@ -1,0 +1,82 @@
+version: "3.6"
+services:
+  postgres15:
+    build: ../../images/postgres15
+    environment:
+      - POSTGRES_PASSWORD=Postgres.123
+      - DATABASE_USER=protheus
+      - DATABASE_PASS=Protheus.123
+      - DATABASE_NAME=p1212510mntdbexp
+    volumes:
+      - "../../:/local"
+      - "postgres15:/var/lib/postgresql/data"
+    ports:
+      - "5432"
+    deploy:
+      resources:
+        limits:
+          cpus: 2
+          memory: 2GB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres || exit 1"]
+      interval: 30s
+      retries: 3
+      start_period: 20s
+  dbaccess:
+    image: docker.totvs.io/totvs-images/dbaccess:12.1.2510-latest
+    environment:
+      - LICENSE_SERVER=localhost
+      - LICENSE_PORT=5555
+      - DBACCESS_DATABASE=POSTGRES
+      - DBACCESS_ALIAS=1212510_bra
+      - POSTGRES_SERVER=postgres15
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=protheus
+      - POSTGRES_USER=protheus
+      - POSTGRES_PASS=Protheus.123
+      - MSSQL_SERVER=postgres15
+      - MSSQL_PORT=5432
+      - MSSQL_DATABASE=protheus
+      - MSSQL_USER=protheus
+      - MSSQL_PASS=Protheus.123
+      - ORACLE_SERVER=postgres15
+      - ORACLE_PORT=5432
+      - ORACLE_USER=protheus
+      - ORACLE_PASS=Protheus.123
+      - LOCK_NUM_ON_DB=1
+    ports:
+      - "7890"
+    depends_on:
+      postgres15:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -x dbaccess64 > /dev/null || exit 1"]
+      interval: 20s
+      retries: 5
+      start_period: 30s
+
+  protheus:
+    image: docker.totvs.io/totvs-images/protheus:12.1.2510-latest
+    environment:
+      - LICENSE_SERVER=localhost
+      - LICENSE_PORT=5555
+      - DBACCESS_SERVER=dbaccess
+      - DBACCESS_PORT=7890
+      - DBACCESS_DATABASE=POSTGRES
+      - DBACCESS_ALIAS=1212510_bra
+      - LOCK_NUM_ON_DB=1
+    volumes:
+      # Map local data structure to Kubernize volume structure
+      # Local: data/totvs/protheus/apo -> Container: /opt/totvs/protheus/volume/current/apo
+      - "../../data/totvs/protheus:/opt/totvs/protheus/volume/current"
+    extra_hosts:
+      - "licensedba.engpro.totvs.com.br:host-gateway"
+
+    ports:
+      - "8086:8080" # Kubernize works on 8080 internal
+      - "1234"
+    depends_on:
+      dbaccess:
+        condition: service_healthy
+volumes:
+  postgres15: {}

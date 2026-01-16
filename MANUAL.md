@@ -12,15 +12,13 @@ Este manual descreve detalhadamente como utilizar as ferramentas de automação 
 
 ## ⚙️ Instalação
 
-Para facilitar o uso, adicione o diretório `tools/cli` ao seu PATH. Adicione a seguinte linha ao seu `~/.bashrc` ou `~/.zshrc`:
+Para facilitar o uso, adicione o diretório `tools/cli` ao seu PATH. Execute o comando abaixo para configurar automaticamente no seu `.bashrc` e `.zshrc`:
 
 ```bash
-export PATH=$PATH:/caminho/para/seu/repositorio/protheus_docker/tools/cli
-```
-
-Após adicionar, recarregue o terminal:
-```bash
-source ~/.bashrc
+# Executar na raiz do repositório
+echo "export PATH=\$PATH:\$HOME/repositorios/protheus_docker/tools/cli" >> ~/.bashrc
+echo "export PATH=\$PATH:\$HOME/repositorios/protheus_docker/tools/cli" >> ~/.zshrc
+source ~/.bashrc 2>/dev/null || source ~/.zshrc
 ```
 
 Agora você pode usar o comando `protheus` de qualquer lugar.
@@ -102,44 +100,35 @@ Este comando entra na pasta do ambiente e executa `docker compose up -d`.
 
 ## 💾 Gerenciamento de Banco de Dados
 
-Scripts facilitadores estão disponíveis para criar bancos iniciais ou restaurar bases congeladas da TOTVS. Eles devem ser executados **dentro** dos containers de banco.
+## 💾 Gerenciamento de Banco de Dados
 
-### PostgreSQL
+O CLI possui comandos dedicados para facilitar a criação e restauração de bancos de dados, detectando automaticamente o tipo de banco (Postgres, Oracle, MSSQL) configurado no ambiente.
+
+### Comandos Gerais
 
 1. **Criar Banco Vazio (Inicial)**:
+   Executa o script de criação de usuários e tablespaces apropriado para o banco.
    ```bash
-   # Via shell do protheus cli
-   protheus shell nome_do_ambiente postgres16 bash /local/tools/database/postgres_create_database.sh
+   protheus db create nome_do_ambiente
    ```
 
 2. **Restaurar Base Congelada (Oficial TOTVS)**:
+   Executa o script de restauração (impdp, pg_restore) utilizando os dumps baixados em `data/totvs/dumps`.
    ```bash
-   protheus shell nome_do_ambiente postgres16 bash /local/tools/database/postgres_pgrestore.sh
+   protheus db restore nome_do_ambiente
    ```
 
-### Oracle
+### Detalhes por Banco
 
-1. **Criar Banco**:
-   ```bash
-   protheus shell nome_do_ambiente oracle19 bash /local/tools/database/oracle_create_database.sh
-   ```
-
-2. **Importar Dump (Impdp)**:
-   ```bash
-   protheus shell nome_do_ambiente oracle19 bash /local/tools/database/oracle_impdp.sh
-   ```
-
-### MSSQL (SQL Server)
-
-1. **Criar Banco**:
-   ```bash
-   protheus shell nome_do_ambiente mssql2022 bash /local/tools/database/mssql_create_database.sh
-   ```
-
-2. **Restaurar Backup**:
-   ```bash
-   protheus shell nome_do_ambiente mssql2022 bash /local/tools/database/mssql_restore_database.sh
-   ```
+- **PostgreSQL**:
+  - `create`: Cria role e database.
+  - `restore`: Restaura via `pg_restore`.
+- **Oracle**:
+  - `create`: Cria tablespaces e usuários.
+  - `restore`: Importa via `impdp`.
+- **MSSQL**:
+  - `create`: Cria banco.
+  - `restore`: Restaura `.bak`.
 
 ---
 
